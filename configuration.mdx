@@ -1,0 +1,258 @@
+---
+title: "Configuration"
+---
+
+Once you initialize the Datapeer client, you've got a whole toolkit of configuration options at your fingertips.
+
+We've already set everything up with our recommended defaults so you can hit the ground running — no config rabbit holes required on day one. But hey, we get it: your app is unique, your users are unique, and a one-size-fits-all approach rarely fits anyone. So go ahead and tweak things to your heart's content.
+
+We built every option with you in mind, and we want this to feel like your SDK, not ours.
+
+```typescript
+import Datapeer from '@datapeer/sdk-core';
+
+const client = new Datapeer({
+	/* Project API key */
+	apiKey: 'pk_your_api_key',
+
+	/* Custom API host */
+	apiHost: 'ingestion.datapeer.io',
+
+	/* Debug logs for better visibility */
+	debug: true,
+
+	/* Disable SDK entirely */
+	disabled: false,
+
+	/* Persistence strategy */
+	persistence: 'localStorage', // 'localStorage' | 'cookie' | 'memory'
+
+	/* { Batching } */
+
+	/* Number of events per batch */
+	batchSize: 10,
+
+	/* Flush interval in ms */
+	batchInterval: 5_000,
+
+	/* Maximum events in a single batch */
+	maxBatchSize: 100,
+
+	/* Maximum events queued before dropping */
+	maxQueueSize: 1_000,
+
+	/* { Session } */
+
+	/* Inactivity timeout before a new session starts (30 min) */
+	sessionTimeout: 1_800_000,
+
+	/* { Cross-domain tracking } */
+
+	/* Share cookies across subdomains */
+	crossSubdomainCookie: true,
+
+	/* Override auto-detected cookie domain */
+	cookieDomain: '.yourapp.com',
+
+	/* { Privacy and Compliance } */
+
+	/* Respect the browser's Do Not Track setting */
+	respectDNT: false,
+
+	/* PII sanitization rules */
+	sanitization: {
+		maskEmails: true,
+		maskPhones: true,
+		maskCreditCards: true,
+		customPatterns: [/\d{3}-\d{2}-\d{4}/], // e.g. SSN pattern
+	},
+
+	/* { Network } */
+
+	/* Number of retry attempts on failure */
+	retryCount: 3,
+
+	/* Delay between retries in ms */
+	retryDelay: 1_000,
+
+	/* Request timeout in ms */
+	timeout: 10_000,
+
+	/* { Autocapture } */
+
+	/* Capture pageviews on route change */
+	capturePageviews: true,
+
+	/* Capture page-leave / unload events */
+	capturePageleave: true,
+
+	autocapture: {
+		/* Click tracking */
+		clicks: {
+			enabled: true,
+			optInMode: false,
+			elementAllowlist: ['button', 'a', 'input'],
+			elementBlocklist: ['body'],
+			cssAllowlist: ['button.cta', 'a[href^="/app"]', '.track-me'],
+			cssBlocklist: ['.navigation', '#header', '[data-sensitive]'],
+			ignoreContainers: ['.sidebar', 'nav', 'footer'],
+		},
+
+		/* Pageview tracking */
+		pageviews: {
+			enabled: true,
+			urlAllowlist: ['/app/*', '/dashboard/*'],
+			urlBlocklist: ['/admin/*', '/internal/*'],
+		},
+
+		/* Page-leave tracking */
+		pageleave: true,
+
+		/* Form interaction tracking */
+		forms: {
+			enabled: true,
+			trackSubmissions: true,
+			trackFieldChanges: false,
+			debounceMs: 300,
+			ignoreFields: ['password', 'credit_card', 'ssn'],
+			sanitization: {
+				maskEmails: true,
+				maskPhones: true,
+				maskCreditCards: true,
+			},
+		},
+
+		/* Rage click detection */
+		rageClicks: {
+			threshold: 3,
+			windowMs: 1_000,
+		},
+
+		/* Element visibility tracking */
+		visibility: {
+			enabled: true,
+			threshold: 0.5,
+			observeSelector: '[dp-track-visibility]',
+		},
+
+		/* Core Web Vitals reporting */
+		webVitals: {
+			enabled: true,
+			reportAllChanges: false,
+		},
+	},
+
+	/* { Hooks } */
+
+	/* Transform or drop events before they are sent */
+	beforeSend: (event) => {
+		// Return null to drop the event
+		// Return the (modified) event to send it
+		return event;
+	},
+
+	/* Global error handler */
+	onError: (error) => {
+		console.error('[Datapeer]', error);
+	},
+});
+```
+
+| Attribute              | Default                   | Type                                   | Description                                                                      |
+| ---------------------- | ------------------------- | -------------------------------------- | -------------------------------------------------------------------------------- |
+| `apiKey`               | —                         | `string`                               | Your project API key. **Required.**                                              |
+| `apiHost`              | `'http://localhost:3000'` | `string`                               | Custom API host for event ingestion.                                             |
+| `debug`                | `false`                   | `boolean`                              | Enable debug logs for better visibility during development.                      |
+| `disabled`             | `false`                   | `boolean`                              | Disable the SDK entirely. Useful for dev/staging environments.                   |
+| `persistence`          | `'localStorage'`          | `'localStorage' | 'cookie' | 'memory'` | Strategy used to persist identity and session data.                              |
+| `batchSize`            | `10`                      | `number`                               | Number of events to include per batch.                                           |
+| `batchInterval`        | `5000`                    | `number`                               | Time in ms between automatic batch flushes.                                      |
+| `maxBatchSize`         | `100`                     | `number`                               | Maximum number of events allowed in a single batch.                              |
+| `maxQueueSize`         | `1000`                    | `number`                               | Maximum events queued before oldest events are dropped.                          |
+| `sessionTimeout`       | `1800000`                 | `number`                               | Inactivity timeout in ms before a new session starts (default 30 min).           |
+| `crossSubdomainCookie` | `true`                    | `boolean`                              | Share cookies across subdomains when using cookie persistence.                   |
+| `cookieDomain`         | Auto-detected             | `string`                               | Override the auto-detected cookie domain (e.g., `'.yourapp.com'`).               |
+| `respectDNT`           | `false`                   | `boolean`                              | Respect the browser's Do Not Track setting.                                      |
+| `sanitization`         | See below                 | `SanitizationConfig`                   | PII sanitization rules applied to captured event data.                           |
+| `capturePageviews`     | `true`                    | `boolean`                              | Automatically capture pageview events on route changes.                          |
+| `capturePageleave`     | `true`                    | `boolean`                              | Automatically capture page-leave / unload events.                                |
+| `autocapture`          | `true`                    | `boolean | AutocaptureConfig`          | Enable or fine-tune automatic event capture.                                     |
+| `retryCount`           | `3`                       | `number`                               | Number of retry attempts on failed network requests.                             |
+| `retryDelay`           | `1000`                    | `number`                               | Delay in ms between retry attempts.                                              |
+| `timeout`              | `10000`                   | `number`                               | Request timeout in ms.                                                           |
+| `beforeSend`           | `undefined`               | `(event) => event | null`              | Hook to transform or drop events before they are sent. Return `null` to discard. |
+| `onError`              | `undefined`               | `(error: Error) => void`               | Global error handler for SDK errors.                                             |
+
+### `SanitizationConfig`
+
+| Attribute         | Default | Type       | Description                                |
+| ----------------- | ------- | ---------- | ------------------------------------------ |
+| `maskEmails`      | `true`  | `boolean`  | Mask email addresses in captured data.     |
+| `maskPhones`      | `true`  | `boolean`  | Mask phone numbers in captured data.       |
+| `maskCreditCards` | `true`  | `boolean`  | Mask credit card numbers in captured data. |
+| `customPatterns`  | `[]`    | `RegExp[]` | Additional regex patterns to mask.         |
+
+### `AutocaptureConfig`
+
+| Attribute    | Default | Type                                    | Description                                         |
+| ------------ | ------- | --------------------------------------- | --------------------------------------------------- |
+| `clicks`     | `true`  | `boolean | ClickAutocaptureConfig`      | Configure automatic click tracking.                 |
+| `pageviews`  | `true`  | `boolean | PageviewAutocaptureConfig`   | Configure automatic pageview tracking.              |
+| `pageleave`  | `true`  | `boolean`                               | Capture page-leave events.                          |
+| `forms`      | `false` | `boolean | FormAutocaptureConfig`       | Capture form submissions and field interactions.    |
+| `rageClicks` | `false` | `boolean | RageClickConfig`             | Detect and capture rage click events.               |
+| `visibility` | `false` | `boolean | VisibilityAutocaptureConfig` | Track element visibility via Intersection Observer. |
+| `webVitals`  | `false` | `boolean | WebVitalsConfig`             | Report Core Web Vitals metrics.                     |
+
+### `ClickAutocaptureConfig`
+
+| Attribute          | Default     | Type       | Description                                                                         |
+| ------------------ | ----------- | ---------- | ----------------------------------------------------------------------------------- |
+| `enabled`          | `true`      | `boolean`  | Enable or disable click autocapture.                                                |
+| `optInMode`        | `false`     | `boolean`  | When `true`, only capture clicks on elements with the `dp-capture` attribute.       |
+| `elementAllowlist` | `undefined` | `string[]` | Only capture clicks on these HTML tags (e.g., `['button', 'a']`).                   |
+| `elementBlocklist` | `undefined` | `string[]` | Never capture clicks on these HTML tags. Takes precedence over allowlist.           |
+| `cssAllowlist`     | `undefined` | `string[]` | Only capture clicks matching these CSS selectors.                                   |
+| `cssBlocklist`     | `undefined` | `string[]` | Never capture clicks matching these CSS selectors. Takes precedence over allowlist. |
+| `ignoreContainers` | `undefined` | `string[]` | Ignore clicks on elements within these container selectors.                         |
+
+### `PageviewAutocaptureConfig`
+
+| Attribute      | Default     | Type       | Description                                                                                |
+| -------------- | ----------- | ---------- | ------------------------------------------------------------------------------------------ |
+| `enabled`      | `true`      | `boolean`  | Enable or disable pageview autocapture.                                                    |
+| `urlAllowlist` | `undefined` | `string[]` | Only capture pageviews for URLs matching these wildcard patterns.                          |
+| `urlBlocklist` | `undefined` | `string[]` | Never capture pageviews for URLs matching these patterns. Takes precedence over allowlist. |
+
+### `FormAutocaptureConfig`
+
+| Attribute           | Default   | Type                 | Description                                                 |
+| ------------------- | --------- | -------------------- | ----------------------------------------------------------- |
+| `enabled`           | `true`    | `boolean`            | Enable or disable form autocapture.                         |
+| `trackSubmissions`  | `true`    | `boolean`            | Capture form submission events.                             |
+| `trackFieldChanges` | `false`   | `boolean`            | Capture individual field change events.                     |
+| `debounceMs`        | `300`     | `number`             | Debounce time in ms for field change events.                |
+| `ignoreFields`      | `[]`      | `string[]`           | Field names to exclude from capture (e.g., `['password']`). |
+| `sanitization`      | See above | `SanitizationConfig` | Field-level PII sanitization overrides.                     |
+
+### `RageClickConfig`
+
+| Attribute   | Default | Type     | Description                                              |
+| ----------- | ------- | -------- | -------------------------------------------------------- |
+| `threshold` | `3`     | `number` | Number of clicks required to trigger a rage click event. |
+| `windowMs`  | `1000`  | `number` | Time window in ms within which clicks must occur.        |
+
+### `VisibilityAutocaptureConfig`
+
+| Attribute         | Default                   | Type      | Description                                                       |
+| ----------------- | ------------------------- | --------- | ----------------------------------------------------------------- |
+| `enabled`         | `true`                    | `boolean` | Enable or disable visibility tracking.                            |
+| `threshold`       | `0.5`                     | `number`  | Intersection ratio required to consider an element visible (0–1). |
+| `observeSelector` | `'[dp-track-visibility]'` | `string`  | CSS selector for elements to observe.                             |
+
+### `WebVitalsConfig`
+
+| Attribute          | Default | Type      | Description                                                              |
+| ------------------ | ------- | --------- | ------------------------------------------------------------------------ |
+| `enabled`          | `true`  | `boolean` | Enable or disable Web Vitals reporting.                                  |
+| `reportAllChanges` | `false` | `boolean` | When `true`, report every metric change instead of only the final value. |

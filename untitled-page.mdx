@@ -1,0 +1,55 @@
+---
+title: "Getting started"
+---
+
+import SnippetIntro from '/snippets/snippet-intro.mdx';
+
+This page is strictly for the JavaScript web SDK, if you're looking to use Datapeer server-side features you can see our JavaScript (nodejs) SDK.
+
+## Prerequisites
+
+Before you begin, ensure you have:
+
+- A Datapeer account with an active project
+- Your project API key in hands (starts with pk\_)
+
+## Installation
+
+<Tabs>
+  <Tab title="npm">
+    ```shellscript
+    npm install @datapeer/sdk-core
+    ```
+  </Tab>
+  <Tab title="yarn">
+    ```shellscript
+    yarn add @datapeer/sdk-core
+    ```
+  </Tab>
+  <Tab title="pnpm">
+    ```shellscript
+    pnpm add @datapeer/sdk-core
+    ```
+  </Tab>
+</Tabs>
+
+See our framework specific docs for **<u>React, Next.js, Vue, Angular, Astro, Remix and Svelte</u>** for framework-specific features.
+
+## Quick Start
+
+Once installed, initialize the SDK with your API key:
+
+```typescript
+import Datapeer from '@datapeer/sdk-core';
+
+const client = new Datapeer({
+	apiKey: 'pk_your_api_key'
+});
+
+/* Track your first event */
+client.track('page_viewed', { page: 'page_viewed' });
+```
+
+Please note that from this moment on Datapeer will, by default, capture pageviews, clicks, change of inputs and form submissions. See our [configuration](/configuration) tab for more details.
+
+**You're all set!** This basic setup allows the SDK to track events and sending them to Datapeer.
