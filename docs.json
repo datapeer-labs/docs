@@ -106,6 +106,7 @@
     }
   },
   "appearance": {
-    "strict": true
+    "strict": true,
+    "default": "light"
   }
 }
