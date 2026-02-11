@@ -3,9 +3,9 @@
   "theme": "palm",
   "name": "Datapeer Docs",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#ee37f3",
+    "light": "#d311ef",
+    "dark": "#781480"
   },
   "favicon": "/favicon.svg",
   "navigation": {
@@ -16,9 +16,9 @@
           {
             "group": "Getting started",
             "pages": [
-              "tracking",
               "index",
-              "quickstart"
+              "quickstart",
+              "tracking"
             ]
           },
           {
@@ -29,7 +29,9 @@
                 "group": "JavaScript (web)",
                 "pages": [
                   "untitled-page",
-                  "configuration"
+                  "usage",
+                  "configuration",
+                  "cookies"
                 ]
               }
             ]
@@ -38,10 +40,7 @@
       }
     ]
   },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
+  "logo": "/logo/light.svg",
   "navbar": {
     "links": [
       {
@@ -77,5 +76,8 @@
   "appearance": {
     "strict": true,
     "default": "light"
+  },
+  "background": {
+    "decoration": "grid"
   }
 }

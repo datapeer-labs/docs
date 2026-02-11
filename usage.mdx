@@ -1,0 +1,277 @@
+---
+title: "Usage"
+---
+
+By default, Datapeer will collect **autocaptured events**, including pageviews, clicks, change of inputs, forms and more. If you want to disable, or learn more about it, check the [configuration](/configuration) page.
+
+## Let's capture custom events
+
+Datapeer enables you to capture custom events - and you can even chose their name and add some cool metadatas to it!
+
+```typescript
+datapeer.capture('user_onboarding_completed');
+```
+
+Let's start playing with some metadatas:
+
+```typescript
+datapeer.capture('user_onboarding_completed', { time_spent_in_minutes: 50 });
+```
+
+## Identified and anonymous events
+
+Datapeer gives you two flavors of event capture: **identified** and **anonymous**. Think of it as the difference between knowing _who_ did something and just knowing _something happened_.
+
+### Identified events
+
+Identified events let you tie actions to a specific user — perfect for understanding individual journeys and building rich user profiles over time. Here are some common use cases:
+
+- Tracking logged-in user behavior across sessions
+- Monitoring feature adoption per user or account
+- Building conversion funnels tied to real users
+- Powering personalized experiences based on past activity
+- Debugging issues reported by a specific user (_"it works on my machine" finally has a paper trail_)
+
+<Warning>
+  We strongly discourage adding PII (emails, phone numbers, etc.) directly to your event data. Use a unique user ID instead — your compliance team will thank you, and so will we.
+</Warning>
+
+### Anonymous events
+
+Anonymous events can't be individually identified — and that's the whole point. They're your go-to choice when you care about _what_ is happening, not _who_ is doing it.
+
+- Tracking landing page performance and bounce rates
+- Measuring marketing campaign effectiveness
+- Monitoring general traffic patterns and page popularity
+- A/B testing variations without needing user identity
+- Capturing Core Web Vitals and performance metrics site-wide
+
+In short: if you don't need a name tag, don't use one.
+
+<Warning>
+  Anonymous events are significantly cheaper than identified ones. We love your enthusiasm for data, but your wallet will love you more if you only capture identified events when they actually bring value to your business.
+</Warning>
+
+## Identifying users
+
+You can identify a user with a single call — just pass a unique ID and any traits you'd like to attach:
+
+```typescript
+datapeer.identify(user.id, {
+  name: user.name,
+  email: user.email,
+});
+```
+
+Once identified, all subsequent events will be tied to that user. No extra wiring needed — we handle the rest.
+
+When the user logs out, just clear the identity:
+```typescript
+datapeer.reset(); // That's it. Back to anonymous. Clean slate.
+```
+
+This keeps the device ID and session intact — so you can still track the anonymous visitor after logout. Perfect for shared devices or "logged out but still browsing" scenarios.
+
+Need a *truly* fresh start? Use `fullReset()`:
+```typescript
+datapeer.fullReset(); // New device ID. New session. Like they never existed.
+```
+
+This generates a brand new device ID and session — as if this is a completely new visitor opening your site for the first time. Use this sparingly, because you're essentially creating a stranger.
+
+### Which reset should I use?
+
+| Method | Device ID | Session | Use case |
+| --- | --- | --- | --- |
+| `reset()` | Kept | Kept | User logs out but you still want to track anonymous activity on the same device |
+| `fullReset()` | New | New | Complete identity wipe — multi-user kiosks, privacy-sensitive flows, or test environments |
+
+<Warning>
+  After `fullReset()`, there's no way to reconnect the new anonymous visitor to the previous user. It's a one-way door. If you just need to log someone out, `reset()` is almost always what you want.
+</Warning>
+
+## Aliasing anonymous users
+
+Here's the thing: your most interesting users often start as strangers. They browse around, click things, maybe add something to a cart — all before they ever sign up. Without aliasing, that entire pre-signup journey vanishes into the void. And nobody wants a mystery funnel.
+
+`.alias()` connects an anonymous visitor's activity to their newly created account, so you get the **full story** from first pageview to conversion.
+
+### The typical flow
+
+```typescript
+// 1. Anonymous visitor lands on your site
+//    Datapeer track them with a device ID automatically
+datapeer.capture('Product Viewed', { product_id: 'shoes-123' });
+
+// 2. They add something to cart (still anonymous)
+datapeer.capture('Added to Cart', { product_id: 'shoes-123', price: 99.99 });
+
+// 3. They sign up — this is where the magic happens
+async function handleSignup(formData) {
+  const user = await api.createUser(formData);
+
+  // Link all previous anonymous activity to this user
+  datapeer.alias(user.id);
+
+  // Then identify them with traits
+  datapeer.identify(user.id, {
+    email: user.email,
+    name: user.name,
+    plan: 'free',
+  });
+}
+
+// 4. Now every past AND future event belongs to one unified profile
+datapeer.capture('Purchase Completed', { order_id: 'order_789', total: 99.99 });
+```
+
+In your analytics, you'll see the complete journey stitched together:
+
+```
+device_abc123 → user_456
+├── Product Viewed      (anonymous)
+├── Added to Cart       (anonymous)
+├── Signed Up           (aliased)
+└── Purchase Completed  (identified)
+```
+
+No gaps. No ghosts. Just a clean, connected timeline.
+
+### When to use each method
+
+| Scenario                         | Method                                | Why                                          |
+| -------------------------------- | ------------------------------------- | -------------------------------------------- |
+| User signs up for the first time | `alias()` then `identify()`           | Links anonymous history to the new account   |
+| User logs in again               | `identify()` only                     | They're already known — no alias needed      |
+| Updating user properties         | `identify()` or `setUserProperties()` | Just updating traits, not merging identities |
+| User logs out                    | `reset()`                             | Clears identity, resumes anonymous tracking  |
+
+### The golden pattern
+```typescript
+// Signup → alias + identify
+async function handleSignup(formData) {
+  const user = await api.createUser(formData);
+  datapeer.alias(user.id);
+  datapeer.identify(user.id, {
+    email: user.email,
+    name: user.name,
+    created_at: user.createdAt,
+  });
+}
+
+// Login → just identify
+async function handleLogin(credentials) {
+  const user = await api.login(credentials);
+  datapeer.identify(user.id, {
+    last_login: new Date(),
+  });
+}
+
+// Logout → reset (keep device tracking)
+function handleLogout() {
+  datapeer.reset();
+}
+
+// Nuclear option → full reset (shared kiosk, privacy wipe, etc.)
+function handleFullWipe() {
+  datapeer.fullReset(); // goodbye, forever
+}
+```
+
+<Warning>
+  Only call `.alias()` once per user — during their first signup or identification. Calling it on every login won't break anything (we're forgiving like that), but it's unnecessary work. Save those API calls for something fun.
+</Warning>
+
+## Setting user properties
+
+Already identified a user but need to update their traits later? No need to call `identify()` again — just use `setUserProperties()`:
+
+```typescript
+// User just upgraded their plan
+datapeer.setUserProperties({
+  plan: 'premium',
+  upgraded_at: new Date().toISOString(),
+});
+
+// Add context as you learn more about them
+datapeer.setUserProperties({
+  company_size: '50-100',
+  role: 'engineering_manager',
+  favorite_color: 'blue', // hey, you never know when this is useful
+});
+```
+
+Properties are merged with the existing user profile — nothing gets overwritten unless you explicitly set the same key again. Think of it as gently layering on context over time.
+
+<Warning>
+  `setUserProperties()` only works after a user has been identified. Calling it on an anonymous visitor is like writing a name tag for someone who hasn't shown up yet — it won't stick.
+</Warning>
+
+## Groups
+
+Users don't exist in a vacuum. They belong to teams, companies, workspaces — whatever you call them. The `group()` method lets you associate a user with a group so you can analyze behavior at a higher level.
+
+```typescript
+// Associate the current user with a company
+datapeer.group('company', 'acme_inc', {
+  name: 'Acme Inc.',
+  plan: 'enterprise',
+  employee_count: 250,
+  industry: 'manufacturing',
+});
+```
+
+The first argument is the **group type** (you can have multiple!), the second is the **group ID**, and the third is an optional bag of properties to attach to that group.
+
+### Multiple group types
+
+Real life is messy — a user might belong to several groups at once. We support that:
+
+```typescript
+// User belongs to a company
+datapeer.group('company', 'acme_inc', {
+  name: 'Acme Inc.',
+  plan: 'enterprise',
+});
+
+// ...and a team within that company
+datapeer.group('team', 'team_engineering', {
+  name: 'Engineering',
+  lead: 'alice',
+  headcount: 12,
+});
+
+// ...and a workspace
+datapeer.group('workspace', 'ws_prod', {
+  name: 'Production',
+  region: 'us-east-1',
+});
+```
+
+Once grouped, you can slice your analytics by any of these dimensions. _"How does the engineering team's feature adoption compare to sales?"_ — that kind of question becomes trivially easy to answer.
+
+### Common use cases
+
+| Group type  | Example                             | Why                                    |
+| ----------- | ----------------------------------- | -------------------------------------- |
+| `company`   | B2B SaaS with multi-tenant accounts | Track usage and health per customer    |
+| `team`      | Collaboration tools                 | Compare behavior across teams          |
+| `workspace` | Project management apps             | Analyze activity per workspace         |
+| `classroom` | EdTech platforms                    | Monitor engagement per class           |
+| `franchise` | Multi-location businesses           | Benchmark locations against each other |
+
+### Updating group properties
+
+Call `group()` again with the same type and ID — properties will be merged, just like `setUserProperties()`:
+
+```typescript
+// Initial group setup
+datapeer.group('company', 'acme_inc', { plan: 'free' });
+
+// Months later, they upgrade
+datapeer.group('company', 'acme_inc', { plan: 'enterprise', arr: 120000 });
+```
+
+<Warning>
+  Groups are associated with the current user session. Make sure you call `group()` after `identify()` so the association lands on the right user. Grouping anonymous visitors works too, but the real power comes when you can see _which users_ in a group are driving specific behaviors.
+</Warning>

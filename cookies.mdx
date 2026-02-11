@@ -1,0 +1,185 @@
+---
+title: "Cookies?"
+---
+
+<img
+  src="/cookies."
+  alt="Cookies"
+  title="Cookies"
+  className="ml-auto"
+  style={{ width:"41%" }}
+/>
+
+
+Datapeer needs to remember things between page loads — like who the user is, what session they're in, and which device they're using. That's where persistence comes in. We give you four strategies to choose from, so you can balance performance, privacy, and cross-domain tracking however you see fit.
+
+## Persistence modes
+
+### `cookie+localStorage` (recommended)
+
+This is the default, and honestly, it's the sweet spot. We store everything in localStorage for speed and capacity, but also sync a few critical IDs to cookies so cross-subdomain tracking works seamlessly.
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  persistence: 'cookie+localStorage', // this is already the default
+});
+```
+
+Only three keys ever touch cookies: `device_id`, `session_id`, and `distinct_id`. Everything else stays in localStorage where it belongs. Minimal cookie footprint, maximum capability — your users' browsers will barely notice we're here.
+
+### `localStorage`
+
+No cookies at all. Everything lives in localStorage, scoped to the current origin (protocol + domain + port). Fast, simple, and cookie-jar-free.
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  persistence: 'localStorage',
+});
+```
+
+The trade-off? No cross-subdomain tracking. If your users hop between `app.yoursite.com` and `www.yoursite.com`, they'll look like different visitors. If you're running a single-domain app, though, this is a perfectly solid choice.
+
+### `cookie`
+
+All SDK data stored as cookies. This is the old-school approach — works everywhere, even in browsers where localStorage is restricted or disabled.
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  persistence: 'cookie',
+});
+```
+
+Cookies are set with a 365-day expiration, `SameSite=Lax`, and the `Secure` flag on HTTPS. Cross-subdomain is enabled by default.
+
+### `memory`
+
+Nothing persists. All data lives in an in-memory Map and vanishes the moment the page unloads. Refresh the page? New visitor. Close the tab? Gone forever.
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  persistence: 'memory',
+});
+```
+
+This is ideal for privacy-sensitive environments, testing, or scenarios where you genuinely don't want any trace left behind. Think of it as incognito mode for your analytics.
+
+### Choosing the right mode
+
+| Mode | Persists across refreshes | Cross-subdomain | Cookies used | Best for |
+| --- | --- | --- | --- | --- |
+| `cookie+localStorage` | Yes | Yes | 3 keys only | Most apps (recommended) |
+| `localStorage` | Yes | No | None | Single-domain, cookie-free setups |
+| `cookie` | Yes | Yes | All keys | Legacy browsers, cookie-only policies |
+| `memory` | No | No | None | Privacy-first, testing, ephemeral sessions |
+
+## Cross-subdomain tracking
+
+If your app spans multiple subdomains, Datapeer automatically detects your root domain and sets cookies accordingly:
+```
+app.yourapp.com     → cookie domain: .yourapp.com
+www.yourapp.com     → cookie domain: .yourapp.com
+dashboard.yourapp.com → cookie domain: .yourapp.com
+```
+
+This means a user who starts on your marketing site and ends up in your app dashboard is recognized as the same visitor. No extra work required.
+
+We handle the edge cases too — second-level TLDs like `.co.uk` and `.com.br`, localhost, IP addresses — all gracefully managed without you lifting a finger.
+
+### Configuration
+
+Cross-subdomain tracking is enabled by default when using `cookie` or `cookie+localStorage` persistence. You can turn it off or override the domain manually:
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+
+  // Disable cross-subdomain tracking
+  crossSubdomainCookie: false,
+
+  // Or manually set the cookie domain
+  cookieDomain: '.yourapp.com',
+});
+```
+
+<Warning>
+  Cross-subdomain tracking only works with `cookie` or `cookie+localStorage` persistence. If you're using `localStorage` or `memory`, this setting has no effect — because there are no cookies to share.
+</Warning>
+
+## What gets stored
+
+Every key is prefixed with `dp_` to avoid conflicts with your own storage. Here's the full inventory:
+
+| Key | Purpose | Synced to cookies | Example |
+| --- | --- | --- | --- |
+| `device_id` | Unique device identifier | Yes | `550e8400-e29b-41d4-a716-446655440000` |
+| `session_id` | Current session identifier | Yes | `6ba7b810-9dad-11d1-80b4-00c04fd430c8` |
+| `distinct_id` | User ID (device ID when anonymous, your user ID after `identify()`) | Yes | `user_123` |
+| `user_properties` | Custom user traits set via `setUserProperties()` | No | `{ plan: "premium" }` |
+| `initial_referrer` | Referrer from the user's very first visit | No | `https://google.com` |
+| `initial_utm` | UTM parameters from the first visit | No | `{ source: "twitter", medium: "social" }` |
+| `group_*` | Group associations (company, team, etc.) | No | `{ id: "acme_inc", name: "Acme" }` |
+| `opt_out` | User's tracking opt-out preference | No | `"true"` or `"false"` |
+
+In hybrid mode (`cookie+localStorage`), only the first three keys — the ones marked "Yes" — are synced to cookies. Everything else stays exclusively in localStorage.
+
+## Session management
+
+Sessions are powered by the persistence layer. Here's how the pieces fit together:
+
+- **Device ID** — generated once, persisted forever. This is your user's long-term anonymous identifier.
+- **Session ID** — refreshed after 30 minutes of inactivity (configurable via `sessionTimeout`). Represents a single browsing session.
+- **Distinct ID** — starts as the device ID, then switches to your user ID after `identify()` is called.
+- **Initial referrer & UTMs** — captured on the very first visit and never overwritten. First touch attribution, locked in.
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+
+  // Refresh session after 15 minutes of inactivity instead of 30
+  sessionTimeout: 900_000,
+});
+```
+
+## Cookie security
+
+When cookies are in play, we set them up with care:
+
+- **`SameSite=Lax`** — prevents CSRF attacks while still allowing top-level navigations
+- **`Secure`** — cookies only sent over HTTPS (automatically applied when your site uses HTTPS)
+- **`path=/`** — cookies available site-wide
+- **365-day expiration** — long enough for meaningful analytics, short enough to be reasonable
+
+`HttpOnly` is intentionally *not* set — the SDK needs JavaScript access to read and write these values. This is standard practice for client-side analytics.
+
+## Privacy & opt-out
+
+We take privacy seriously. The SDK includes built-in opt-out support:
+```typescript
+// User opts out of tracking
+datapeer.optOut();
+
+// User opts back in
+datapeer.optIn();
+```
+
+You can also respect the browser's Do Not Track setting:
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  respectDNT: true, // If the browser says "don't track", we won't
+});
+```
+
+The opt-out preference is stored in the same persistence layer as everything else — so it survives page refreshes and comes back on future visits.
+
+## Error handling & fallbacks
+
+Things go wrong sometimes — localStorage might be full, cookies might be blocked, the browser might be in a weird state. We handle all of it:
+
+- Every storage operation is wrapped in a try-catch
+- If localStorage fails, we automatically fall back to in-memory storage
+- No crashes, no thrown errors, no broken apps
+
+Your analytics degrading gracefully is infinitely better than your app crashing because a cookie didn't set. We'll always pick resilience over data.
+
+<Warning>
+  If the SDK falls back to in-memory storage, data won't persist across page loads. You'll still capture events for the current page session, but returning visitors will appear as new ones. Check the `debug: true` logs if you suspect this is happening.
+</Warning>
