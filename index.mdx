@@ -1,4 +1,73 @@
 ---
-title: "Overview"
-description: "Welcome to the new home for your documentation"
+title: "Getting Started"
 ---
+
+## What is Datapeer?
+
+Datapeer is an analytics platform for understanding how users interact with your web applications. Track events, build funnels, create dashboards, and actually _understand_ what's happening in your product.
+
+Your data stays in Datapeer. No third-party sharing, no surprises.
+
+## Products
+
+Datapeer (during the beta version) offers two products, each with its own documentation:
+
+- Web Analytics: understand your traffic, pageviews, bounce rates, referrers, UTM attribution and Core web Vitals
+- Product Analytics: understand your users, custom events, funnels, user identification, session tracking and behavioral insights. 
+
+You can use one or both — they share the same SDK and dashboard, so there's no extra setup if you decide to add the other later.
+
+## Quick start
+
+### 1. Create your project
+
+Sign up at [datapeer.io](https://datapeer.io), create your organization, and set up your first project. You'll get an API key — that's your golden ticket.
+
+### 2. Install the SDK
+
+Pick your platform and follow the guide:
+
+| Platform                | Guide                          |
+| ----------------------- | ------------------------------ |
+| JavaScript / TypeScript | [SDK Core →](/sdks/javascript) |
+| React                   | [React SDK →](/sdks/react)     |
+| Next.js                 | [Next.js SDK →](/sdks/nextjs)  |
+
+### 3. See your data
+
+Head over to the **Activity** page in your dashboard and watch the events roll in. If you don't see events right away, give it a few seconds — the SDK batches events before sending them. Patience is a virtue, and so is network efficiency.
+
+## Core concepts
+
+### Projects
+
+A project represents a website or app you want to track. Each project gets its own API key and its own isolated data — so your marketing site and your main app don't step on each other's toes.
+
+### Events
+
+Events are the building blocks of your analytics. The SDK automatically captures standard events like `dp_pageview`, `dp_click`, and `dp_form_submit`. You can also track custom events with a single line of code.
+
+Every event is automatically enriched with device info, session data, and attribution — no extra work on your end.
+
+### Users & identity
+
+Every visitor starts as anonymous. When they sign up or log in, you link their activity to a real user ID. Their full journey — before and after signup — stitched together in one timeline.
+
+### Sessions
+
+A session starts when a user lands on your site and expires after 30 minutes of inactivity. Tracked automatically. You don't need to manage them yourself.
+
+### Insights & Dashboards
+
+Create **trends** to see how events change over time. Build **funnels** to find where users drop off. Pin your favorites to **dashboards** and share them with your team — because "I think signups are up" is not a data strategy.
+
+## What's next?
+
+| Page                                    | What you'll learn                                             |
+| --------------------------------------- | ------------------------------------------------------------- |
+| [Configuration](/configuration)         | Fine-tune the SDK — batching, autocapture, privacy settings   |
+| [Usage](/usage)                         | Custom events, identification, aliasing, groups               |
+| [Tracking & Privacy](/tracking-privacy) | PII sanitization, opt-out, Do Not Track, and data controls    |
+| [Persistence & Cookies](/persistence)   | How data is stored, cookie settings, cross-subdomain tracking |
+
+Welcome aboard. We're glad you're here, and we're building this for you. If something feels off, confusing, or just plain broken — let us know. We read every piece of feedback, and we actually do something about it.

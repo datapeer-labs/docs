@@ -1,5 +1,263 @@
 ---
-title: "Tracking"
+title: "Tracking & Privacy"
 ---
 
-We highly recommend you enabling Datapeer on all of your applicable websites (i.e. marketing page, platform, admin). That way you'll be able to track a user from their entire journey, Datapeer automatically sets a cross-domain cookie.
+Analytics is only valuable if your users trust you with their data. Datapeer is built with privacy as a first-class feature — not an afterthought bolted on after a compliance audit. We give you powerful tracking _and_ the tools to make sure you're doing it responsibly.
+
+Because "we take your privacy seriously" shouldn't just be a line in a Terms of Service nobody reads.
+
+## Opt-out & opt-in
+
+Your users should always have a say in whether they're being tracked. Datapeer makes this dead simple:
+
+```typescript
+// User clicks "I don't want to be tracked"
+datapeer.optOut();
+
+// User changes their mind
+datapeer.optIn();
+```
+
+When a user opts out, the SDK stops capturing events entirely. No pageviews, no clicks, no custom events — nothing. Their preference is persisted across sessions, so they won't have to opt out again next time they visit.
+
+### Do Not Track
+
+Some users set the Do Not Track flag in their browser. Most analytics tools quietly ignore it. You don't have to:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  respectDNT: true,
+});
+```
+
+When enabled, Datapeer checks the browser's `navigator.doNotTrack` setting. If it's on, the SDK behaves as if the user called `optOut()` — no tracking, no events, no questions asked.
+
+## PII sanitization
+
+Let's be real: user data has a way of sneaking into places it shouldn't. Someone types their email into a search bar, a credit card number ends up in a form field you're tracking, a phone number appears in a URL parameter. It happens.
+
+Datapeer automatically scrubs common PII patterns from your event data before it ever leaves the browser:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  sanitization: {
+    maskEmails: true,       // john@example.com → j***@***.com
+    maskPhones: true,       // +1 (555) 123-4567 → ***-****
+    maskCreditCards: true,  // 4111 1111 1111 1111 → ****-****-****-1111
+  },
+});
+```
+
+All three are enabled by default. You're protected out of the box — even if you forget to think about it.
+
+### Custom patterns
+
+Got other sensitive data floating around? Social security numbers, patient IDs, internal account codes? Add your own regex patterns:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  sanitization: {
+    maskEmails: true,
+    maskPhones: true,
+    maskCreditCards: true,
+    customPatterns: [
+      /\d{3}-\d{2}-\d{4}/,   // SSN
+      /PAT-\d{6}/,            // Patient IDs
+      /ACCT-[A-Z0-9]{10}/,    // Internal account codes
+    ],
+  },
+});
+```
+
+Any value matching these patterns will be masked before the event is sent. Your compliance team can sleep at night, and so can you.
+
+### Form-level sanitization
+
+If you're using form autocapture, you can apply sanitization rules specifically to form data — and exclude sensitive fields entirely:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  autocapture: {
+    forms: {
+      enabled: true,
+      ignoreFields: ['password', 'credit_card', 'ssn', 'cvv'],
+      sanitization: {
+        maskEmails: true,
+        maskPhones: true,
+        maskCreditCards: true,
+      },
+    },
+  },
+});
+```
+
+Fields listed in `ignoreFields` are never captured — not masked, not redacted, just completely skipped. Some data is better left alone.
+
+## Controlling what gets tracked
+
+### Element-level opt-out
+
+Sometimes you want autocapture running broadly, but need to exclude specific elements. Add the `dp-no-capture` attribute to any element you want Datapeer to ignore:
+
+```html
+<!-- This button will NOT be tracked -->
+<button dp-no-capture>Delete my account</button>
+
+<!-- This entire section is invisible to Datapeer -->
+<div dp-no-capture>
+  <input type="text" placeholder="Social Security Number" />
+  <button>Submit sensitive form</button>
+</div>
+```
+
+`dp-no-capture` is _always_ respected, regardless of any other configuration. It's the universal "leave this alone" signal.
+
+### Element-level opt-in
+
+Prefer a whitelist approach? Enable opt-in mode and only track elements you explicitly mark:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  autocapture: {
+    clicks: {
+      optInMode: true,
+    },
+  },
+});
+```
+
+Now only elements with the `dp-capture` attribute will be tracked:
+
+```html
+<!-- Only THIS button gets tracked -->
+<button dp-capture>Sign Up</button>
+
+<!-- These are completely ignored -->
+<button>Browse Plans</button>
+<a href="/pricing">See Pricing</a>
+```
+
+This is great for sensitive applications — healthcare, finance, legal — where you want absolute control over what gets captured.
+
+### CSS and container filtering
+
+For more granular control, you can allowlist or blocklist entire sections of your UI:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  autocapture: {
+    clicks: {
+      // Never track clicks inside these containers
+      ignoreContainers: ['.settings-panel', '#payment-form', '[data-sensitive]'],
+
+      // Never track elements matching these selectors
+      cssBlocklist: ['.internal-nav', '[data-private]'],
+    },
+  },
+});
+```
+
+### URL filtering
+
+Don't want to capture pageviews for admin panels or internal tools? Filter them out:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  autocapture: {
+    pageviews: {
+      urlBlocklist: ['/admin/*', '/internal/*', '/debug/*'],
+    },
+  },
+});
+```
+
+## The `beforeSend` hook
+
+For ultimate control, the `beforeSend` hook lets you inspect, modify, or drop any event right before it's sent to the server:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  beforeSend: (event) => {
+    // Drop events from internal users
+    if (event.properties?.email?.endsWith('@yourcompany.com')) {
+      return null; // Event is silently discarded
+    }
+
+    // Redact sensitive URL parameters
+    if (event.properties?.url) {
+      const url = new URL(event.properties.url);
+      url.searchParams.delete('token');
+      url.searchParams.delete('secret');
+      event.properties.url = url.toString();
+    }
+
+    return event;
+  },
+});
+```
+
+Return the event to send it (modified or not). Return `null` to drop it entirely. This runs on every single event, so you have a final checkpoint before anything leaves the browser.
+
+## Privacy-friendly persistence
+
+Your choice of persistence mode has privacy implications. Here's how they stack up:
+
+| Mode                  | Data stored in browser               | Best for                                              |
+| --------------------- | ------------------------------------ | ----------------------------------------------------- |
+| `cookie+localStorage` | Yes (localStorage + 3 cookies)       | Most apps — good balance of functionality and privacy |
+| `localStorage`        | Yes (localStorage only, no cookies)  | Cookie-free tracking, single domain                   |
+| `cookie`              | Yes (cookies only)                   | Legacy browser support                                |
+| `memory`              | No (in-memory only, lost on refresh) | Maximum privacy — no persistent trace whatsoever      |
+
+For privacy-sensitive environments, `memory` mode ensures absolutely nothing is written to disk:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  persistence: 'memory',
+});
+```
+
+Every page refresh starts fresh — new device ID, new session, no history. It's the most private option available, at the cost of losing returning visitor recognition.
+
+For more details on persistence strategies, see the [Persistence & Cookies](/cookies) page.
+
+## Disabling tracking entirely
+
+Need to shut everything off? Maybe you're in a test environment, maybe a user hasn't accepted your cookie banner yet, maybe it's Friday and you just want some peace:
+
+```typescript
+// Option 1: Disable at initialization
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  disabled: true, // SDK loads but does absolutely nothing
+});
+
+// Option 2: Disable at runtime
+datapeer.optOut();
+```
+
+The `disabled` flag is useful for conditionally enabling Datapeer based on environment or user consent:
+
+```typescript
+const datapeer = new Datapeer({
+  apiKey: 'pk_your_api_key',
+  disabled: !userHasAcceptedCookies(),
+});
+```
+
+## A note on our philosophy
+
+We built Datapeer because we believe you shouldn't have to choose between understanding your users and respecting their privacy. Every feature on this page exists because we think analytics tools should make it _easy_ to do the right thing — not just possible.
+
+Sanitization is on by default. Opt-out is a single function call. Element exclusion is a single HTML attribute. We'd rather you accidentally over-protect your users' data than accidentally expose it.
+
+If you have questions about compliance, GDPR, or privacy best practices with Datapeer, reach out to us. We're not lawyers, but we'll do our best to point you in the right direction.

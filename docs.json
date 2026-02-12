@@ -11,13 +11,13 @@
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
-        "groups": [
+        "tab": "Datapeer",
+        "icon": "archway",
+        "pages": [
+          "index",
           {
-            "group": "Getting started",
+            "group": "Platform",
             "pages": [
-              "index",
-              "quickstart",
               "tracking"
             ]
           },
@@ -33,7 +33,8 @@
                   "configuration",
                   "cookies"
                 ]
-              }
+              },
+              "react"
             ]
           }
         ]

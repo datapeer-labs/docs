@@ -1,0 +1,395 @@
+---
+title: "React"
+---
+
+The React SDK (`@datapeer/react`) gives you components and hooks purpose-built for React. Same powerful tracking, but with patterns that feel native to how you already build your apps.
+
+If you've ever put analytics logic inside a `useEffect` and felt a little guilty about it — this is for you.
+
+## Installation
+```bash
+npm install @datapeer/sdk-core @datapeer/react
+```
+
+You need both packages. The core SDK does the heavy lifting, and the React SDK wraps it in components and hooks that play nicely with the React lifecycle.
+
+## Setup
+
+### 1. Create your client
+
+Create a file to initialize the Datapeer client. You only do this once — treat it like a singleton:
+```typescript
+// src/datapeer.ts
+import { DatapeerClient } from '@datapeer/sdk-core';
+
+export const datapeer = new DatapeerClient({
+  apiKey: import.meta.env.VITE_DATAPEER_API_KEY,
+  apiHost: import.meta.env.VITE_DATAPEER_API_HOST,
+  debug: import.meta.env.DEV,
+});
+```
+
+### 2. Wrap your app with the provider
+```tsx
+// src/main.tsx
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { DatapeerProvider } from '@datapeer/react';
+import { datapeer } from './datapeer';
+import App from './App';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <DatapeerProvider client={datapeer}>
+      <App />
+    </DatapeerProvider>
+  </StrictMode>
+);
+```
+
+### 3. Start tracking
+```tsx
+import { useDatapeer } from '@datapeer/react';
+
+function SignUpButton() {
+  const datapeer = useDatapeer();
+
+  const handleClick = () => {
+    datapeer?.capture('signup_clicked', {
+      button_location: 'hero',
+    });
+  };
+
+  return <button onClick={handleClick}>Sign Up</button>;
+}
+```
+
+That's it. You're tracking events in React. No HOCs, no render props, no class component nightmares from 2017.
+
+## API Reference
+
+### `<DatapeerProvider>`
+
+Context provider that makes the Datapeer client available to all child components.
+
+| Prop | Type | Description |
+| --- | --- | --- |
+| `client` | `DatapeerClient` | Your initialized Datapeer client instance |
+| `children` | `ReactNode` | Your application components |
+```tsx
+<DatapeerProvider client={datapeer}>
+  <App />
+</DatapeerProvider>
+```
+
+### `useDatapeer()`
+
+Hook to access the Datapeer client from any component within the provider.
+
+Returns `DatapeerClient | null` — the client may be `null` during initial render, so always use optional chaining:
+```tsx
+const datapeer = useDatapeer();
+
+// Always use optional chaining
+datapeer?.capture('event_name', { key: 'value' });
+```
+
+### `<DatapeerCaptureOnViewed>`
+
+A component that automatically fires an event when its children become visible in the viewport. Powered by Intersection Observer under the hood — no scroll listeners, no performance headaches.
+
+| Prop | Type | Default | Description |
+| --- | --- | --- | --- |
+| `name` | `string` | — | Event name to capture when visible |
+| `properties` | `object` | `{}` | Additional event properties |
+| `observerOptions` | `IntersectionObserverInit` | `{ threshold: 0.1 }` | Visibility threshold configuration |
+| `trackAllChildren` | `boolean` | `false` | Track each child element separately |
+
+Basic usage:
+```tsx
+import { DatapeerCaptureOnViewed } from '@datapeer/react';
+
+<DatapeerCaptureOnViewed name="hero-banner">
+  <HeroBanner />
+</DatapeerCaptureOnViewed>
+```
+
+Custom visibility threshold — fire when 50% of the element is visible:
+```tsx
+<DatapeerCaptureOnViewed
+  name="pricing-section"
+  properties={{ variant: 'annual' }}
+  observerOptions={{ threshold: 0.5 }}
+>
+  <PricingCards />
+</DatapeerCaptureOnViewed>
+```
+
+Track multiple children individually — each one fires its own event with a `child_index` property:
+```tsx
+<DatapeerCaptureOnViewed
+  name="product-card"
+  properties={{ gallery_type: 'featured' }}
+  trackAllChildren
+>
+  <ProductCard id="1" />
+  <ProductCard id="2" />
+  <ProductCard id="3" />
+</DatapeerCaptureOnViewed>
+```
+
+## Common patterns
+
+### Identify users on login
+
+The best place to identify users is as early as possible — typically in your root `App` component or a top-level layout:
+```tsx
+import { useDatapeer } from '@datapeer/react';
+import { useEffect } from 'react';
+
+function App() {
+  const datapeer = useDatapeer();
+  const user = useCurrentUser(); // your auth hook
+
+  useEffect(() => {
+    if (user && datapeer) {
+      datapeer.identify(user.id, {
+        email: user.email,
+        name: user.name,
+        plan: user.plan,
+      });
+    }
+  }, [user, datapeer]);
+
+  return <Routes />;
+}
+```
+
+### Associate users with organizations
+```tsx
+function Dashboard() {
+  const datapeer = useDatapeer();
+  const { user, organization } = useAuth();
+
+  useEffect(() => {
+    if (user && organization && datapeer) {
+      datapeer.identify(user.id, {
+        email: user.email,
+        name: user.name,
+      });
+
+      datapeer.group('organization', organization.id, {
+        name: organization.name,
+        plan: organization.plan,
+      });
+    }
+  }, [user, organization, datapeer]);
+
+  return <div>Dashboard</div>;
+}
+```
+
+### Track form submissions
+```tsx
+function ContactForm() {
+  const datapeer = useDatapeer();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+
+    datapeer?.capture('contact_form_submitted', {
+      form_type: 'contact',
+      has_message: !!formData.get('message'),
+    });
+
+    // submit form...
+  };
+
+  return <form onSubmit={handleSubmit}>...</form>;
+}
+```
+
+### E-commerce tracking
+```tsx
+function ProductPage({ product }) {
+  const datapeer = useDatapeer();
+
+  useEffect(() => {
+    datapeer?.capture('product_viewed', {
+      product_id: product.id,
+      product_name: product.name,
+      price: product.price,
+      category: product.category,
+    });
+  }, [product, datapeer]);
+
+  const handleAddToCart = () => {
+    datapeer?.capture('add_to_cart', {
+      product_id: product.id,
+      price: product.price,
+      quantity: 1,
+    });
+  };
+
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <button onClick={handleAddToCart}>Add to Cart</button>
+    </div>
+  );
+}
+```
+
+### Scroll-based content tracking
+
+See how far users actually read — not just whether they opened the page:
+```tsx
+function BlogPost({ post }) {
+  return (
+    <article>
+      <h1>{post.title}</h1>
+
+      <DatapeerCaptureOnViewed
+        name="blog-content-start"
+        properties={{ post_id: post.id }}
+      >
+        <div>{post.intro}</div>
+      </DatapeerCaptureOnViewed>
+
+      <DatapeerCaptureOnViewed
+        name="blog-content-middle"
+        properties={{ post_id: post.id }}
+        observerOptions={{ threshold: 0.5 }}
+      >
+        <div>{post.body}</div>
+      </DatapeerCaptureOnViewed>
+
+      <DatapeerCaptureOnViewed
+        name="blog-content-end"
+        properties={{ post_id: post.id, completed: true }}
+      >
+        <div>{post.conclusion}</div>
+      </DatapeerCaptureOnViewed>
+    </article>
+  );
+}
+```
+
+Now you know if people actually make it to the conclusion — or if they bounce after the first paragraph. (*We've all been there.*)
+
+## Autocapture in React
+
+Autocapture works out of the box with React — pageviews, clicks, forms, rage clicks, and Web Vitals are all tracked automatically without you writing a single event call.
+
+### Excluding elements
+
+Add `dp-no-capture` to any element you want Datapeer to skip:
+```tsx
+<button dp-no-capture onClick={handleClick}>
+  Don't Track This
+</button>
+```
+
+### Opt-in mode
+
+Only track elements you explicitly mark with `dp-capture`:
+```typescript
+// src/datapeer.ts
+export const datapeer = new DatapeerClient({
+  apiKey: import.meta.env.VITE_DATAPEER_API_KEY,
+  autocapture: {
+    clicks: {
+      optInMode: true,
+    },
+  },
+});
+```
+```tsx
+{/* Only this button gets tracked */}
+<button dp-capture onClick={handleClick}>
+  Track This
+</button>
+
+{/* This one is invisible to Datapeer */}
+<button onClick={handleOther}>
+  Not This
+</button>
+```
+
+## TypeScript support
+
+The SDK is written in TypeScript and ships with full type definitions:
+```typescript
+import type {
+  DatapeerConfig,
+  DatapeerEvent,
+  EventProperties,
+  UserTraits,
+} from '@datapeer/react';
+
+const properties: EventProperties = {
+  button_text: 'Sign Up',
+  location: 'navbar',
+};
+
+const traits: UserTraits = {
+  email: 'user@example.com',
+  plan: 'premium',
+};
+```
+
+No `@types` packages to install. No `any` types to cast. Just autocomplete that works.
+
+## Best practices
+
+**Initialize once.** Create a single `DatapeerClient` instance and export it. Never create a new instance inside a component — that's a memory leak with extra steps.
+```typescript
+// ✅ src/datapeer.ts — one instance, exported
+export const datapeer = new DatapeerClient({ ... });
+
+// ❌ Inside a component — don't do this
+function Component() {
+  const datapeer = new DatapeerClient({ ... });
+}
+```
+
+**Always use optional chaining.** The client can be `null` during the initial render. One `?.` saves you from a runtime error.
+```tsx
+datapeer?.capture('event');  // ✅
+datapeer.capture('event');   // ❌ may throw during initial render
+```
+
+**Identify early.** The sooner you identify a user, the more complete their profile will be. Do it in your root component, not deep in a settings page.
+
+**Use meaningful event names.** Your future self will thank you when they're building a funnel six months from now.
+```tsx
+datapeer?.capture('checkout_completed');       // ✅ clear and specific
+datapeer?.capture('subscription_upgraded');     // ✅ action-based
+
+datapeer?.capture('click');                     // ❌ click on what?
+datapeer?.capture('action');                    // ❌ what action?
+```
+
+**Include context in properties.** A bare event name tells you *what* happened. Properties tell you *why it matters*.
+```tsx
+datapeer?.capture('button_clicked', {
+  button_text: 'Sign Up',
+  location: 'hero',
+  variant: 'primary',
+});
+```
+
+## Troubleshooting
+
+### "useDatapeer() was called but no DatapeerProvider was found"
+
+The hook is being called outside the provider. Make sure `<DatapeerProvider>` wraps your entire app — usually in `main.tsx` or your root layout.
+
+### "Cannot read properties of undefined"
+
+You're calling a Datapeer method without optional chaining. Add `?.` before the method call.
+
+### Events not appearing in the dashboard
+
+A few things to check: enable `debug: true` in your client config and open the browser console — you'll see every event being captured and sent. Check the Network tab for failed requests. Make sure your API key is correct. And remember, events are batched by default (every 5 seconds), so give it a moment. If you're impatient, call `datapeer.flush()` to send everything immediately.
